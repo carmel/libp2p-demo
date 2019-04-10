@@ -204,10 +204,9 @@ makeBasicHost()方法创建一个go-libp2p-basichost对象。basichost对象包�
 
 为了创建swarm（和一个`basichost`），这个例子需要：
 
-`ipfs协议ID`，如QmNtX1cvrm2K6mQmMEaMxAuB4rTexhd87vpYVot4sEZzxc。该示例在每次运行时自动生成密钥对，并使用从公钥中提取的ID（公钥的哈希值）。使用`-insecure`时，它会使连接保持未加密状态（否则，它会使用密钥对来加密通信）。
-`Multiaddress`，以明确如何被访问到这个节点。可以有好几个（例如，使用不同的协议或位置）。示例：/ip4/127.0.0.1/tcp/1234。
-`go-libp2p-peerstore`，用作地址簿，在节点ID与multiaddresses之间进行匹配。当手动打开连接时（使用`Connect()`），peertore会自动装载。或者，我们可以像示例一样手动添加`Addddr()`。
-
+`ipfs协议ID`，如QmNtX1cvrm2K6mQmMEaMxAuB4rTexhd87vpYVot4sEZzxc。该示例在每次运行时自动生成密钥对，并使用从公钥中提取的ID（公钥的哈希值）。使用`-insecure`时，它会使连接保持未加密状态（否则，它会使用密钥对来加密通信）。  
+`Multiaddress`，以明确如何被访问到这个节点。可以有好几个（例如，使用不同的协议或位置）。示例：/ip4/127.0.0.1/tcp/1234。  
+`go-libp2p-peerstore`，用作地址簿，在节点ID与multiaddresses之间进行匹配。当手动打开连接时（使用`Connect()`），peertore会自动装载。或者，我们可以像示例一样手动添加`Addddr()`。  
 `basichost`，现在可用以使用`NewStream`打开流（两个节点之间的双向通道），并使用它们发送和接收标记有Protocol.ID（字符串）的数据。主机还可以通过`SetStreamHandle()`方法监听指定协议的传入连接。
 
 该示例利用以上所有这些以保证监听方与发送方之间使用协议`/echo/1.0.0`（也可以是其他协议）进行的通信。
@@ -284,14 +283,14 @@ Run ./chat -d /ip4/127.0.0.1/tcp/3001/ipfs/QmdXGaeGiVA745XorV1jr11RHxB9z4fqykm6x
 > no
 ```
 
-操作节点'A'.  
-将127.0.0.1用公共IP<PUBLIC_IP>替代，如果节点'B'有的话.
+操作节点'A'：
+将127.0.0.1用节点'B'的公共IP<PUBLIC_IP>替代，如果节点'B'有的话.
 
 ```
 > ./chat -d /ip4/127.0.0.1/tcp/3001/ipfs/QmdXGaeGiVA745XorV1jr11RHxB9z4fqykm6xCUPX1aTJo
 Run ./chat -d /ip4/127.0.0.1/tcp/3001/ipfs/QmdXGaeGiVA745XorV1jr11RHxB9z4fqykm6xCUPX1aTJo
 
-下面是节点的multiaddress:
+下面是节点的multiaddress：
 /ip4/0.0.0.0/tcp/0/ipfs/QmWVx9NwsgaVWMRHNCpesq1WQAw2T3JurjGDNeVNWifPS7
 > hi
 > hello
@@ -300,3 +299,243 @@ Run ./chat -d /ip4/127.0.0.1/tcp/3001/ipfs/QmdXGaeGiVA745XorV1jr11RHxB9z4fqykm6x
 **注意：** 默认情况下会启用调试模式，调试模式将始终在每次执行时生成相同的节点ID（在每个节点上）。运行可执行文件时，使用`--debug false`标志禁用调试。
 
 **注意：** 如果您正在寻找具有节点发现的实现，[整合节点发现的P2P聊天应用](#整合节点发现的P2P聊天应用)支持通过`rendezvous point`进行节点发现。
+
+# 整合节点发现的P2P聊天应用
+
+接下来演示一个简单的p2p聊天应用程序。您将学习如何在网络中发现节点（使用kad-dht），连接到它并打开聊天流。
+
+## 构建
+
+在`go-libp2p-examples`目录运行以下命令：
+```
+> make deps
+> cd chat-with-rendezvous/
+> go build -o chat
+```
+
+## 用法
+
+分别使用两个不同的终端窗口运行下面命令：
+
+```
+./chat -listen /ip4/127.0.0.1/tcp/6666
+./chat -listen /ip4/127.0.0.1/tcp/6668
+```
+## 思考它的工作过程
+
+1. **配置一个p2p host**
+```go
+ctx := context.Background()
+
+// 使用libp2p.New方法构建一个新的libp2p Host.
+// 其他选项参数也可在这里添加.
+host, err := libp2p.New(ctx)
+```
+[libp2p.New](https://godoc.org/github.com/libp2p/go-libp2p#New)是一个节点的构造方法. 它基于指定配置创建一个host.但该例的所有配置选项均采用默认的, [参阅](https://godoc.org/github.com/libp2p/go-libp2p#New)
+
+2. **为传入连接设置默认处理函数。**
+
+本函数当远程节点发起连接并向本地节点推送流时被调用。
+```go
+// 配置流处理函数.
+host.SetStreamHandler("/chat/1.1.0", handleStream)
+```
+
+```handleStream```在每向本地节点新传入流时执行`。 ```stream```用于在本地和远程节点之间交换数据。本例使用非阻塞函数从此流中读取和写入。
+
+
+```go
+func handleStream(stream net.Stream) {
+
+    // 为非阻塞式读写创建一个缓存流
+    rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
+
+    go readData(rw)
+    go writeData(rw)
+
+    // 'stream'将始终处于打开状态直至您将它关闭（或被其他节点关闭）
+}
+```
+
+3. **使用```host```作为本地节点启动新的DHT客户端。**
+
+```go
+dht, err := dht.New(ctx, host)
+```
+
+4. **连接到IPFS引导节点。**
+
+这些节点用于查找附近使用DHT的节点。
+
+```go
+for _, addr := range bootstrapPeers {
+
+    iaddr, _ := ipfsaddr.ParseString(addr)
+
+    peerinfo, _ := peerstore.InfoFromP2pAddr(iaddr.Multiaddr())
+
+    if err := host.Connect(ctx, *peerinfo); err != nil {
+        fmt.Println(err)
+    } else {
+        fmt.Println("Connection established with bootstrap node: ", *peerinfo)
+    }
+}
+```
+
+5. **使用`rendezvous point`告知您的存在。**
+
+[routingDiscovery.Advertise](https://godoc.org/github.com/libp2p/go-libp2p-discovery#RoutingDiscovery.Advertise) makes this node announce that it can provide a value for the given key. Where a key in this case is ```rendezvousString```. Other peers will hit the same key to find other peers.
+
+`routingDiscovery.Advertise`使该节点宣布它可以为给定的密钥(称之为`rendezvousString`)提供值。其他节点将使用相同的密钥来查找对应节点。
+
+```go
+routingDiscovery := discovery.NewRoutingDiscovery(kademliaDHT)
+discovery.Advertise(ctx, routingDiscovery, config.RendezvousString)
+```
+
+6. **查找临近节点**
+
+[routingDiscovery.FindPeers](https://godoc.org/github.com/libp2p/go-libp2p-discovery#RoutingDiscovery.FindPeers)将返回已告知存在的节点通道。
+
+```go
+peerChan, err := routingDiscovery.FindPeers(ctx, config.RendezvousString)
+```
+[discovery](https://godoc.org/github.com/libp2p/go-libp2p-discovery#pkg-index)包内部使用DHT来[提供](https://godoc.org/github.com/libp2p/go-libp2p-kad-dht#IpfsDHT.Provide)和[查找提供者](https://godoc.org/github.com/libp2p/go-libp2p-kad-dht#IpfsDHT.FindProviders)。
+
+**Note:** Although [routingDiscovery.Advertise](https://godoc.org/github.com/libp2p/go-libp2p-discovery#RoutingDiscovery.Advertise) and [routingDiscovery.FindPeers](https://godoc.org/github.com/libp2p/go-libp2p-discovery#RoutingDiscovery.FindPeers) works for a rendezvous peer discovery, this is not the right way of doing it. Libp2p is currently working on an actual rendezvous protocol ([libp2p/specs#56](https://github.com/libp2p/specs/pull/56)) which can be used for bootstrap purposes, real time peer discovery and application specific routing.
+
+
+
+**注意：** 虽然[routingDiscovery.Advertise](https://godoc.org/github.com/libp2p/go-libp2p-discovery#RoutingDiscovery.Advertise)和[routingDiscovery.FindPeers](https://godoc.org/github.com/libp2p/go-libp2p-discovery#RoutingDiscovery.FindPeers)适用于`rendezvous`节点发现，但这不是正确的方法。Libp2p目前正在开发一个实际的`rendezvous`协议（[libp2p/specs＃56](https://github.com/libp2p/specs/pull/56)），用以辅助实时节点发现并应用特定的路由。
+
+7. **向新发现的节点开启流**
+
+最终我们向新发现的节点开启流。
+
+```go
+go func() {
+		for peer := range peerChan {
+			if peer.ID == host.ID() {
+				continue
+			}
+			fmt.Println("Found peer:", peer)
+
+			fmt.Println("Connecting to:", peer)
+			stream, err := host.NewStream(ctx, peer.ID, protocol.ID(config.ProtocolID))
+
+			if err != nil {
+				fmt.Println("Connection failed:", err)
+				continue
+			} else {
+				rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
+
+				go writeData(rw)
+				go readData(rw)
+			}
+
+			fmt.Println("Connected to:", peer)
+		}
+	}()
+```
+
+
+# mdns实现节点发现的P2P聊天应用
+
+This program demonstrates a simple p2p chat application. You will learn how to discover a peer in the network (using mdns), connect to it and open a chat stream. This example is heavily influenced by (and shamelessly copied from) `chat-with-rendezvous` example
+
+本例演示了一个简单的p2p聊天应用程序。 您将学习如何在网络中（使用mdns）发现节点，连接到它并打开聊天流。这个例子受到[整合节点发现的P2P聊天应用](#整合节点发现的P2P聊天应用)例子的影响很大（并且无耻地复制）
+
+
+## 程序构建过程
+
+```
+go get -v -d ./...
+
+go build
+```
+
+## 用法
+
+分别使用两个不同的终端窗口运行下面命令：
+
+```
+./chat-with-mdns -port 6666
+./chat-with-mdns -port 6668
+```
+
+
+## 程序工作机制
+
+1. **配置p2p host**
+```go
+ctx := context.Background()
+
+host, err := libp2p.New(ctx)
+```
+
+2. **为传入连接设置默认处理函数。**
+
+This function is called on the local peer when a remote peer initiate a connection and starts a stream with the local peer.
+```go
+// Set a function as stream handler.
+host.SetStreamHandler("/chat/1.1.0", handleStream)
+```
+
+```handleStream``` is executed for each new stream incoming to the local peer. ```stream``` is used to exchange data between local and remote peer. This example uses non blocking functions for reading and writing from this stream.
+
+```go
+func handleStream(stream net.Stream) {
+
+    // Create a buffer stream for non blocking read and write.
+    rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
+
+    go readData(rw)
+    go writeData(rw)
+
+    // 'stream' will stay open until you close it (or the other side closes it).
+}
+```
+
+3. **Find peers nearby using mdns**
+
+Start [mdns discovery](https://godoc.org/github.com/libp2p/go-libp2p/p2p/discovery#NewMdnsService) service in host.
+
+```go
+ser, err := discovery.NewMdnsService(ctx, peerhost, time.Hour, rendezvous)
+```
+register [Notifee interface](https://godoc.org/github.com/libp2p/go-libp2p/p2p/discovery#Notifee) with service so that we get notified about peer discovery
+
+```go
+	n := &discoveryNotifee{}
+	ser.RegisterNotifee(n)
+```
+
+
+4. **Open streams to peers found.**
+
+Finally we open stream to the peers we found, as we find them
+
+```go
+	peer := <-peerChan // will block untill we discover a peer
+	fmt.Println("Found peer:", peer, ", connecting")
+
+	if err := host.Connect(ctx, peer); err != nil {
+		fmt.Println("Connection failed:", err)
+	}
+
+	// open a stream, this stream will be handled by handleStream other end
+	stream, err := host.NewStream(ctx, peer.ID, protocol.ID(cfg.ProtocolID))
+
+	if err != nil {
+		fmt.Println("Stream open failed", err)
+	} else {
+		rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
+
+		go writeData(rw)
+		go readData(rw)
+		fmt.Println("Connected to:", peer)
+	}
+```
+
+## Authors
+1. Bineesh Lazar
