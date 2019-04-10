@@ -204,10 +204,10 @@ makeBasicHost()方法创建一个go-libp2p-basichost对象。basichost对象包�
 
 为了创建swarm（和一个`basichost`），这个例子需要：
 
-`ipfs协议ID`，如QmNtX1cvrm2K6mQmMEaMxAuB4rTexhd87vpYVot4sEZzxc。该示例在每次运行时自动生成密钥对，并使用从公钥中提取的ID（公钥的哈希值）。使用`-insecure`时，它会使连接保持未加密状态（否则，它会使用密钥对来加密通信）。  
-`Multiaddress`，以明确如何被访问到这个节点。可以有好几个（例如，使用不同的协议或位置）。示例：/ip4/127.0.0.1/tcp/1234。  
-`go-libp2p-peerstore`，用作地址簿，在节点ID与multiaddresses之间进行匹配。当手动打开连接时（使用`Connect()`），peertore会自动装载。或者，我们可以像示例一样手动添加`Addddr()`。  
-`basichost`，现在可用以使用`NewStream`打开流（两个节点之间的双向通道），并使用它们发送和接收标记有Protocol.ID（字符串）的数据。主机还可以通过`SetStreamHandle()`方法监听指定协议的传入连接。
+**`ipfs协议ID`**，如QmNtX1cvrm2K6mQmMEaMxAuB4rTexhd87vpYVot4sEZzxc。该示例在每次运行时自动生成密钥对，并使用从公钥中提取的ID（公钥的哈希值）。使用`-insecure`时，它会使连接保持未加密状态（否则，它会使用密钥对来加密通信）。  
+**`Multiaddress`**，以明确如何被访问到这个节点。可以有好几个（例如，使用不同的协议或位置）。示例：/ip4/127.0.0.1/tcp/1234。  
+**`go-libp2p-peerstore`**，用作地址簿，在节点ID与multiaddresses之间进行匹配。当手动打开连接时（使用`Connect()`），peertore会自动装载。或者，我们可以像示例一样手动添加`Addddr()`。  
+**`basichost`**，现在可用以使用`NewStream`打开流（两个节点之间的双向通道），并使用它们发送和接收标记有Protocol.ID（字符串）的数据。主机还可以通过`SetStreamHandle()`方法监听指定协议的传入连接。
 
 该示例利用以上所有这些以保证监听方与发送方之间使用协议`/echo/1.0.0`（也可以是其他协议）进行的通信。
 
