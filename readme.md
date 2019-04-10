@@ -341,7 +341,7 @@ host, err := libp2p.New(ctx)
 host.SetStreamHandler("/chat/1.1.0", handleStream)
 ```
 
-```handleStream```在每向本地节点新传入流时执行`。 ```stream```用于在本地和远程节点之间交换数据。本例使用非阻塞函数从此流中读取和写入。
+`handleStream`在每向本地节点新传入流时执行。`stream`用于在本地和远程节点之间交换数据。本例使用非阻塞函数从此流中读取和写入。
 
 
 ```go
@@ -384,9 +384,7 @@ for _, addr := range bootstrapPeers {
 
 5. **使用`rendezvous point`告知您的存在。**
 
-[routingDiscovery.Advertise](https://godoc.org/github.com/libp2p/go-libp2p-discovery#RoutingDiscovery.Advertise) makes this node announce that it can provide a value for the given key. Where a key in this case is ```rendezvousString```. Other peers will hit the same key to find other peers.
-
-`routingDiscovery.Advertise`使该节点宣布它可以为给定的密钥(称之为`rendezvousString`)提供值。其他节点将使用相同的密钥来查找对应节点。
+[routingDiscovery.Advertise](https://godoc.org/github.com/libp2p/go-libp2p-discovery#RoutingDiscovery.Advertise)使该节点宣布它可以为给定的密钥(称之为`rendezvousString`)提供值。其他节点将使用相同的密钥来查找对应节点。
 
 ```go
 routingDiscovery := discovery.NewRoutingDiscovery(kademliaDHT)
@@ -401,10 +399,6 @@ discovery.Advertise(ctx, routingDiscovery, config.RendezvousString)
 peerChan, err := routingDiscovery.FindPeers(ctx, config.RendezvousString)
 ```
 [discovery](https://godoc.org/github.com/libp2p/go-libp2p-discovery#pkg-index)包内部使用DHT来[提供](https://godoc.org/github.com/libp2p/go-libp2p-kad-dht#IpfsDHT.Provide)和[查找提供者](https://godoc.org/github.com/libp2p/go-libp2p-kad-dht#IpfsDHT.FindProviders)。
-
-**Note:** Although [routingDiscovery.Advertise](https://godoc.org/github.com/libp2p/go-libp2p-discovery#RoutingDiscovery.Advertise) and [routingDiscovery.FindPeers](https://godoc.org/github.com/libp2p/go-libp2p-discovery#RoutingDiscovery.FindPeers) works for a rendezvous peer discovery, this is not the right way of doing it. Libp2p is currently working on an actual rendezvous protocol ([libp2p/specs#56](https://github.com/libp2p/specs/pull/56)) which can be used for bootstrap purposes, real time peer discovery and application specific routing.
-
-
 
 **注意：** 虽然[routingDiscovery.Advertise](https://godoc.org/github.com/libp2p/go-libp2p-discovery#RoutingDiscovery.Advertise)和[routingDiscovery.FindPeers](https://godoc.org/github.com/libp2p/go-libp2p-discovery#RoutingDiscovery.FindPeers)适用于`rendezvous`节点发现，但这不是正确的方法。Libp2p目前正在开发一个实际的`rendezvous`协议（[libp2p/specs＃56](https://github.com/libp2p/specs/pull/56)），用以辅助实时节点发现并应用特定的路由。
 
@@ -441,8 +435,6 @@ go func() {
 
 # mdns实现节点发现的P2P聊天应用
 
-This program demonstrates a simple p2p chat application. You will learn how to discover a peer in the network (using mdns), connect to it and open a chat stream. This example is heavily influenced by (and shamelessly copied from) `chat-with-rendezvous` example
-
 本例演示了一个简单的p2p聊天应用程序。 您将学习如何在网络中（使用mdns）发现节点，连接到它并打开聊天流。这个例子受到[整合节点发现的P2P聊天应用](#整合节点发现的P2P聊天应用)例子的影响很大（并且无耻地复制）
 
 
@@ -463,7 +455,6 @@ go build
 ./chat-with-mdns -port 6668
 ```
 
-
 ## 程序工作机制
 
 1. **配置p2p host**
@@ -475,35 +466,37 @@ host, err := libp2p.New(ctx)
 
 2. **为传入连接设置默认处理函数。**
 
-This function is called on the local peer when a remote peer initiate a connection and starts a stream with the local peer.
+本函数当远程节点发起连接并向本地节点推送流时被调用。
+
 ```go
-// Set a function as stream handler.
+// 配置流处理函数.
 host.SetStreamHandler("/chat/1.1.0", handleStream)
 ```
 
-```handleStream``` is executed for each new stream incoming to the local peer. ```stream``` is used to exchange data between local and remote peer. This example uses non blocking functions for reading and writing from this stream.
+`handleStream`在每向本地节点新传入流时执行。`stream`用于在本地和远程节点之间交换数据。本例使用非阻塞函数从此流中读取和写入。
 
 ```go
 func handleStream(stream net.Stream) {
 
-    // Create a buffer stream for non blocking read and write.
+    // 为非阻塞式读写创建一个缓存流
     rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
 
     go readData(rw)
     go writeData(rw)
 
-    // 'stream' will stay open until you close it (or the other side closes it).
+    // 'stream'将始终处于打开状态直至您将它关闭（或被其他节点关闭）
 }
 ```
 
-3. **Find peers nearby using mdns**
+3. **使用mdns查找附近节点**
 
-Start [mdns discovery](https://godoc.org/github.com/libp2p/go-libp2p/p2p/discovery#NewMdnsService) service in host.
+在host中开启[mdns服务发现](https://godoc.org/github.com/libp2p/go-libp2p/p2p/discovery#NewMdnsService)服务。
 
 ```go
 ser, err := discovery.NewMdnsService(ctx, peerhost, time.Hour, rendezvous)
 ```
-register [Notifee interface](https://godoc.org/github.com/libp2p/go-libp2p/p2p/discovery#Notifee) with service so that we get notified about peer discovery
+
+注册[Notifee接口](https://godoc.org/github.com/libp2p/go-libp2p/p2p/discovery#Notifee)与服务，以便我们收到有关节点发现的通知
 
 ```go
 	n := &discoveryNotifee{}
@@ -511,9 +504,9 @@ register [Notifee interface](https://godoc.org/github.com/libp2p/go-libp2p/p2p/d
 ```
 
 
-4. **Open streams to peers found.**
+4. **向新发现的节点开启流**
 
-Finally we open stream to the peers we found, as we find them
+最后，我们向找到的节点开启流
 
 ```go
 	peer := <-peerChan // will block untill we discover a peer
@@ -536,6 +529,3 @@ Finally we open stream to the peers we found, as we find them
 		fmt.Println("Connected to:", peer)
 	}
 ```
-
-## Authors
-1. Bineesh Lazar
