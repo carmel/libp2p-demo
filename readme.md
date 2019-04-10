@@ -299,4 +299,4 @@ Run ./chat -d /ip4/127.0.0.1/tcp/3001/ipfs/QmdXGaeGiVA745XorV1jr11RHxB9z4fqykm6x
  
 **注意：** 默认情况下会启用调试模式，调试模式将始终在每次执行时生成相同的节点ID（在每个节点上）。运行可执行文件时，使用`--debug false`标志禁用调试。
 
-**注意：** 如果您正在寻找具有节点发现的实现，[chat-with-rendezvous]（../ chat-with-rendezvous）支持通过`rendezvous point`进行节点发现。
+**注意：** 如果您正在寻找具有节点发现的实现，[整合节点发现的P2P聊天应用](#整合节点发现的P2P聊天应用)支持通过`rendezvous point`进行节点发现。
