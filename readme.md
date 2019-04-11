@@ -5,7 +5,7 @@
 
 ## 示例教程
 
-- [libp2p 'host'](#libp2p-'host')
+- [libp2p 'host'](#libp2p-host)
 - [使用libp2p构建http代理](#使用libp2p构建http代理)
 - [echo host](#libp2p之echo客户机/服务器)
 - [Multicodecs with protobufs-多路复用器](#使用rpc样式的protobuf与libp2p进行协议多路复用)
@@ -30,7 +30,7 @@ $:~/go/src/github.com/libp2p/go-libp2p-examples/libp2p-host$ go build host.go
 > mkdir /tmp/libp2p-examples
 > export GOPATH=/tmp/libp2p/examples
 ```
-# libp2p 'host'
+# libp2p host
 
 对于大多数应用来说，host是您需要开始使用的基本构建块。本指南将介绍如何搭建与使用一个简单的host。
 
